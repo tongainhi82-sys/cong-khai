@@ -32,7 +32,7 @@ jobs:
 
 
       # chon thumb tieude bat dau
-      SEQ_BASE_RUN: "3"
+      SEQ_BASE_RUN: "4"
       THUMB_START: "1"
 
       # công tắt chọn poll hoặc cloudflare
