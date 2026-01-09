@@ -24,7 +24,7 @@ jobs:
 
       # ===== THÊM TỪ ĐÂY: cấu hình sub chuẩn hơn (faster-whisper) =====
       WHISPER_MODEL: large-v3
-      WHISPER_LANGUAGE: vi
+      WHISPER_LANGUAGE: en
       WHISPER_DEVICE: cpu
       WHISPER_COMPUTE_TYPE: int8
       WHISPER_BEAM_SIZE: "5"
