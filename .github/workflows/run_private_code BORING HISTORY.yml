@@ -36,7 +36,7 @@ jobs:
 
 
       # chon thumb tieude bat dau
-      SEQ_BASE_RUN: "5"
+      SEQ_BASE_RUN: "15"
       THUMB_START: "1"
 
       # công tắt chọn poll hoặc cloudflare
