@@ -2,20 +2,36 @@ name: run-private-code
 
 on:
   schedule:
-    - cron: "0 20 * * *"  # chạy 4h sáng 
-    - cron: "0 2 * * *"   # chạy 10h sáng 
-    - cron: "0 8 * * *"   # chạy 4h chiều 
-    - cron: "0 14 * * *"   # chạy 10h tối 
-    
-    
-  workflow_dispatch: {}
+    - cron: "0 20 * * *"  # chạy 4h sáng (UTC)
+    - cron: "0 2 * * *"   # chạy 10h sáng (UTC)
+    - cron: "0 8 * * *"   # chạy 4h chiều (UTC)
+    - cron: "0 14 * * *"  # chạy 10h tối (UTC)
 
+  workflow_dispatch:
+    inputs:
+      private_repo:
+        description: "owner/repo của PRIVATE"
+        required: false
+        default: "tongainhi82-sys/rieng-tu"
+      private_ref:
+        description: "branch/tag/sha của PRIVATE"
+        required: false
+        default: "main"
+      workdir:
+        description: "thư mục gốc trong PRIVATE (.)"
+        required: false
+        default: "."
+      youtube_privacy:
+        description: "public | unlisted | private"
+        required: false
+        default: "public"
 
 jobs:
   run-private:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
     concurrency:
       group: run-private-${{ github.ref }}
       cancel-in-progress: false
@@ -26,7 +42,13 @@ jobs:
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
 
-      # ===== THÊM TỪ ĐÂY: cấu hình sub chuẩn hơn (faster-whisper) =====
+      # ===== HuggingFace cache + token (fix warning + tải nhanh hơn) =====
+      HF_HOME: ${{ github.workspace }}/.hf
+      HF_HUB_CACHE: ${{ github.workspace }}/.hf/hub
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HUGGINGFACE_HUB_TOKEN: ${{ secrets.HF_TOKEN }}
+
+      # ===== Faster-Whisper =====
       WHISPER_MODEL: large-v3
       WHISPER_LANGUAGE: en
       WHISPER_DEVICE: cpu
@@ -34,10 +56,9 @@ jobs:
       WHISPER_BEAM_SIZE: "5"
       WHISPER_VAD: "1"
 
-
       # chon thumb tieude bat dau
-      SEQ_BASE_RUN: "15"
-      THUMB_START: "1"
+      SEQ_BASE_RUN: "20"
+      THUMB_START: "3"
 
       # công tắt chọn poll hoặc cloudflare
       IMG_PROVIDER: cloudflare
@@ -78,7 +99,6 @@ jobs:
 
       - name: Export resolved privacy to env
         run: echo "YOUTUBE_PRIVACY=${{ steps.params.outputs.privacy }}" >> "$GITHUB_ENV"
-
 
       # KÉO CODE từ repo PRIVATE (PAT)
       - name: Checkout PRIVATE via PAT
@@ -154,11 +174,20 @@ jobs:
           fi
           echo "[OK] YT secrets đầy đủ."
 
-
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+
+      # ===== Cache HuggingFace models (fix tải model large-v3 bị chậm / bị cancel) =====
+      - name: Cache HuggingFace models (faster-whisper)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.HF_HOME }}
+          key: ${{ runner.os }}-hf-${{ env.WHISPER_MODEL }}
+          restore-keys: |
+            ${{ runner.os }}-hf-
 
       - name: Install system deps (ffmpeg)
         run: |
@@ -172,6 +201,7 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('private-src/**/requirements*.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
+
       - name: Install Python libs
         run: |
           python -m pip install --upgrade pip setuptools wheel
@@ -184,23 +214,18 @@ jobs:
           # Whisper (gói đúng tên: openai-whisper)
           python -m pip install "openai-whisper==20231117"
 
-          # ===== THÊM TỪ ĐÂY: Faster-Whisper (chuẩn hơn) =====
-          
+          # ===== Faster-Whisper =====
           python -m pip install --upgrade --no-cache-dir "faster-whisper==1.2.1"
-
-          python -m pip install "faster-whisper==1.2.1"
+  
           python -c "from faster_whisper import WhisperModel; print('faster-whisper OK')"
-          # Kiểm tra import (dùng python -c để tránh lỗi YAML here-doc)
+          # Kiểm tra import
           python -c "import sys; import whisper, torch, torchaudio; print('Whisper/Torch OK:', whisper.__version__, torch.__version__)"
-
 
           # YAMNet (TensorFlow) để lọc nhạc
           python -m pip install tensorflow-cpu tensorflow-hub
 
-
           # loc banner qr
           python -m pip install opencv-python-headless
-          # Kiểm tra import (dùng python -c để tránh lỗi YAML here-doc)
           python -c "import sys; import whisper, torch, torchaudio; print('Whisper/Torch OK:', whisper.__version__, torch.__version__)"
 
       - name: Install Python deps
